@@ -28,24 +28,6 @@ const Header = ({ history }) => {
   // CommandBar items for navigation
   const _items = [
     {
-      key: 'home',
-      text: 'Home',
-      iconProps: { iconName: 'Home' },
-      onClick: () => history.push('/'),
-    },
-    {
-      key: 'accounts',
-      text: 'Accounts',
-      iconProps: { iconName: 'AccountManagement' },
-      onClick: () => history.push('/accounts'),
-    },
-    {
-      key: 'strategies',
-      text: 'Strategies',
-      iconProps: { iconName: 'BulletedList' },
-      onClick: () => history.push('/strategies'),
-    },
-    {
       key: 'providerMap',
       text: 'Provider Map',
       iconProps: { iconName: 'MapPin' },

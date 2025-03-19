@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Route, Switch } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css"; // Keep Bootstrap for now as we're not updating all components
 import { ThemeProvider, initializeIcons } from '@fluentui/react';
 import Home from "./components/home/Home";
-import Account from "./components/account/Account";
 import ProviderMap from "./components/provider/ProviderMap";
 
 // Initialize FluentUI icons
@@ -29,7 +28,6 @@ function App() {
     <ThemeProvider theme={theme}>
       <Switch>
         <Route exact path="/" component={Home} />      
-        <Route path="/accounts" component={Account} />        
         <Route path="/provider-map" component={ProviderMap} />
       </Switch>
     </ThemeProvider>
