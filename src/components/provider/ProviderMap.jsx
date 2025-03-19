@@ -15,6 +15,7 @@ const ProviderMap = () => {
   const [connections, setConnections] = useState([]);
   
   // Refs
+  const activeInfoWindowRef = useRef(null);
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
 
@@ -59,12 +60,26 @@ const ProviderMap = () => {
     const infoWindow = createInfoWindow(infoContent);
     
     marker.addListener('click', () => {
-      infoWindow.open(googleMapRef.current, marker);
+      openInfoWindow(infoWindow, marker);
     });
     
     // Update providers state
     setProviders(prevProviders => [...prevProviders, newProvider]);
   };
+  
+  
+const openInfoWindow = (infoWindow, marker) => {
+  // Close any currently open info window
+  if (activeInfoWindowRef.current) {
+    activeInfoWindowRef.current.close();
+  }
+  
+  // Open the new info window
+  infoWindow.open(googleMapRef.current, marker);
+  
+  // Update the reference to the currently open info window
+  activeInfoWindowRef.current = infoWindow;
+};
 
   // Function to add a random marker
   const handleAddRandomMarker = () => {
@@ -147,7 +162,11 @@ const ProviderMap = () => {
     
     // Add click listener to the polyline
     polyline.addListener('click', () => {
+      if (activeInfoWindowRef.current) {
+        activeInfoWindowRef.current.close();
+      }
       infoWindow.open(googleMapRef.current);
+      activeInfoWindowRef.current = infoWindow;
     });
     
     // Store connection information
@@ -207,7 +226,7 @@ const ProviderMap = () => {
             const infoWindow = createInfoWindow(infoContent);
             
             marker.addListener('click', () => {
-              infoWindow.open(map, marker);
+              openInfoWindow(infoWindow, marker);
             });
           });
           
