@@ -5,6 +5,7 @@
   "dependencies": {
     "@fluentui/react": "^8.106.2",
     "@google-cloud/storage": "^7.15.2",
+    "@react-google-maps/api": "^2.20.6",
     "@testing-library/jest-dom": "^5.16.2",
     "@testing-library/react": "^12.1.4",
     "@testing-library/user-event": "^13.5.0",

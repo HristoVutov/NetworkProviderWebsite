@@ -2,7 +2,6 @@ import React from "react";
 import { withRouter } from "react-router-dom";
 import {
   CommandBar,
-  ICommandBarItemProps,
   Stack,
   mergeStyleSets,
   getTheme
@@ -45,6 +44,12 @@ const Header = ({ history }) => {
       text: 'Strategies',
       iconProps: { iconName: 'BulletedList' },
       onClick: () => history.push('/strategies'),
+    },
+    {
+      key: 'providerMap',
+      text: 'Provider Map',
+      iconProps: { iconName: 'MapPin' },
+      onClick: () => history.push('/provider-map'),
     },
   ];
 

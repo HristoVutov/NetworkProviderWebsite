@@ -1,0 +1,78 @@
+import { mergeStyleSets } from '@fluentui/react';
+
+// Styles for the component
+export const styles = mergeStyleSets({
+  container: {
+    display: 'flex',
+    height: 'calc(100vh - 80px)',
+    padding: '0 20px 20px',
+  },
+  mainContent: {
+    width: '90%',
+    backgroundColor: '#f8f8f8',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    position: 'relative',
+  },
+  mapContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    borderRadius: '4px',
+  },
+  addButton: {
+    position: 'absolute',
+    top: '10px',
+    left: '10px',
+    zIndex: 1000,
+    width: '40px',
+    height: '40px',
+    backgroundColor: 'white',
+    border: '2px solid #0078d4',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#0078d4',
+  },
+  connectButton: {
+    position: 'absolute',
+    top: '10px',
+    left: '60px',
+    zIndex: 1000,
+    width: '40px',
+    height: '40px',
+    backgroundColor: 'white',
+    border: '2px solid #e23636',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#e23636',
+  },
+  sidePanel: {
+    width: '10%',
+    paddingLeft: '20px',
+  },
+  panelContent: {
+    backgroundColor: 'white',
+    padding: '16px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    borderRadius: '2px',
+  },
+  title: {
+    fontWeight: 'bold',
+    marginBottom: '16px',
+  }
+});
