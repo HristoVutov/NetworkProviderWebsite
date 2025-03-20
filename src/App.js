@@ -4,6 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css"; // Keep Bootstrap for now as we'r
 import { ThemeProvider, initializeIcons } from '@fluentui/react';
 import Home from "./components/home/Home";
 import ProviderMap from "./components/provider/ProviderMap";
+import Login from "./components/account/Login";
 
 // Initialize FluentUI icons
 initializeIcons();
@@ -29,6 +30,7 @@ function App() {
       <Switch>
         <Route exact path="/" component={Home} />      
         <Route path="/provider-map" component={ProviderMap} />
+        <Route path="/account/login" component={Login} />
       </Switch>
     </ThemeProvider>
   );

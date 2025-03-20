@@ -1,17 +1,17 @@
 import React from 'react';
 import { styles } from './mapStyles';
 
-const MapControls = ({ isMapLoaded, canConnect, onAddMarker, onConnectMarkers }) => {
+const MapControls = ({ isMapLoaded, canConnect, isAddingMarker, onAddMarker, onConnectMarkers }) => {
   return (
     <>
-      {/* Plus button for adding random markers */}
+      {/* Plus button for adding markers */}
       {isMapLoaded && (
         <div 
-          className={styles.addButton} 
+          className={`${styles.addButton} ${isAddingMarker ? styles.addButtonActive : ''}`} 
           onClick={onAddMarker}
-          title="Add Random Marker"
+          title={isAddingMarker ? "Cancel adding marker" : "Add Marker"}
         >
-          +
+          {isAddingMarker ? '✕' : '+'}
         </div>
       )}
       

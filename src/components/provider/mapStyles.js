@@ -40,6 +40,11 @@ export const styles = mergeStyleSets({
     fontSize: '24px',
     fontWeight: 'bold',
     color: '#0078d4',
+    transition: 'all 0.2s ease-in-out',
+  },
+  addButtonActive: {
+    backgroundColor: '#0078d4',
+    color: 'white',
   },
   connectButton: {
     position: 'absolute',
@@ -59,6 +64,15 @@ export const styles = mergeStyleSets({
     fontSize: '24px',
     fontWeight: 'bold',
     color: '#e23636',
+  },
+  statusMessage: {
+    position: 'absolute',
+    top: '60px',
+    left: '10px',
+    right: '10px',
+    zIndex: 1000,
+    maxWidth: '400px',
+    margin: '0 auto',
   },
   sidePanel: {
     width: '10%',

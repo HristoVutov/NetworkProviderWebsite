@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Stack, Spinner, SpinnerSize, MessageBar, MessageBarType } from '@fluentui/react';
+import axios from "axios";
 import Header from "../common/Header";
 import SidePanel from "./SidePanel";
 import MapControls from "./MapControls";
@@ -13,11 +14,14 @@ const ProviderMap = () => {
   const [mapError, setMapError] = useState(null);
   const [providers, setProviders] = useState(initialProviders);
   const [connections, setConnections] = useState([]);
+  const [isAddingMarker, setIsAddingMarker] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
   
   // Refs
   const activeInfoWindowRef = useRef(null);
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
+  const clickListenerRef = useRef(null);
 
   // Function to add a marker at specific coordinates
   const addMarkerAt = (lat, lng) => {
@@ -65,8 +69,84 @@ const ProviderMap = () => {
     
     // Update providers state
     setProviders(prevProviders => [...prevProviders, newProvider]);
+
+    // Send coordinates to API
+    sendCoordinatesToAPI(lat, lng);
+
+    return newProvider;
   };
   
+  // Function to send coordinates to API
+   // Function to send coordinates to API
+   const sendCoordinatesToAPI = async (lat, lng) => {
+    try {
+      // Get auth token from cookie
+      const authToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('auth-token='))
+        ?.split('=')[1];
+        
+      if (!authToken) {
+        // Redirect to login if no auth token
+        setStatusMessage({
+          type: MessageBarType.warning,
+          text: 'Please login to add markers. Redirecting to login page...'
+        });
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          window.location.href = '/account/login';
+        }, 2000);
+        
+        return;
+      }
+
+      // Send request with auth token
+      const response = await axios.post('http://localhost:3001/api/point', {
+        lat: lat,
+        lng: lng
+      }, {
+        headers: {
+          'auth-token': authToken
+        }
+      });
+      
+      console.log('API response:', response.data);
+      setStatusMessage({
+        type: MessageBarType.success,
+        text: 'Marker added and coordinates sent to API successfully!'
+      });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setStatusMessage(null);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error sending coordinates to API:', error);
+      
+      // Handle unauthorized errors
+      if (error.response && error.response.status === 401) {
+        setStatusMessage({
+          type: MessageBarType.error,
+          text: 'You are not authorized. Please login again.'
+        });
+        
+        // Clear invalid token
+        document.cookie = 'auth-token=; path=/; max-age=0';
+        
+        // Redirect after a short delay
+        setTimeout(() => {
+          window.location.href = '/account/login';
+        }, 2000);
+      } else {
+        setStatusMessage({
+          type: MessageBarType.error,
+          text: 'Failed to send coordinates to API. Please try again.'
+        });
+      }
+    }
+  };
   
 const openInfoWindow = (infoWindow, marker) => {
   // Close any currently open info window
@@ -81,36 +161,44 @@ const openInfoWindow = (infoWindow, marker) => {
   activeInfoWindowRef.current = infoWindow;
 };
 
-  // Function to add a random marker
-  const handleAddRandomMarker = () => {
-    if (!googleMapRef.current || !window.google || !window.google.maps) {
-      console.error("Map reference or Google Maps not available");
+  // Function to toggle marker addition mode
+  const handleAddMarkerMode = () => {
+    // If we're already in adding marker mode, turn it off
+    if (isAddingMarker) {
+      setIsAddingMarker(false);
+      setStatusMessage(null);
+      
+      // Remove the click listener if it exists
+      if (clickListenerRef.current) {
+        window.google.maps.event.removeListener(clickListenerRef.current);
+        clickListenerRef.current = null;
+      }
       return;
     }
     
-    try {
-      // Generate random coordinates within the visible map bounds
-      const bounds = googleMapRef.current.getBounds();
-      if (!bounds) {
-        console.warn("Map bounds not available, using default view");
-        // Use default coordinates if bounds not available
-        const center = googleMapRef.current.getCenter();
-        const lat = center.lat() + (Math.random() - 0.5) * 10;
-        const lng = center.lng() + (Math.random() - 0.5) * 10;
+    // Turn on adding marker mode
+    setIsAddingMarker(true);
+    setStatusMessage({
+      type: MessageBarType.info,
+      text: 'Click anywhere on the map to add a marker'
+    });
+    
+    // Add a click listener to the map if it doesn't exist
+    if (!clickListenerRef.current && googleMapRef.current) {
+      clickListenerRef.current = googleMapRef.current.addListener('click', (event) => {
+        const lat = event.latLng.lat();
+        const lng = event.latLng.lng();
+        
+        // Add marker and send to API
         addMarkerAt(lat, lng);
-        return;
-      }
-      
-      const ne = bounds.getNorthEast();
-      const sw = bounds.getSouthWest();
-      
-      // Generate random lat/lng within the visible bounds
-      const lat = sw.lat() + (ne.lat() - sw.lat()) * Math.random();
-      const lng = sw.lng() + (ne.lng() - sw.lng()) * Math.random();
-      
-      addMarkerAt(lat, lng);
-    } catch (error) {
-      console.error("Error adding random marker:", error);
+        
+        // Turn off adding marker mode after adding
+        setIsAddingMarker(false);
+        
+        // Remove the click listener
+        window.google.maps.event.removeListener(clickListenerRef.current);
+        clickListenerRef.current = null;
+      });
     }
   };
 
@@ -258,6 +346,11 @@ const openInfoWindow = (infoWindow, marker) => {
           connection.polyline.setMap(null);
         }
       });
+      
+      // Remove map click listener if it exists
+      if (clickListenerRef.current && window.google && window.google.maps) {
+        window.google.maps.event.removeListener(clickListenerRef.current);
+      }
     };
   }, []); // Empty dependency array means this runs once on mount
 
@@ -281,11 +374,26 @@ const openInfoWindow = (infoWindow, marker) => {
             </Stack>
           ) : null}
           
+          {/* Status Message */}
+          {statusMessage && (
+            <div className={styles.statusMessage}>
+              <MessageBar
+                messageBarType={statusMessage.type}
+                isMultiline={false}
+                dismissButtonAriaLabel="Close"
+                onDismiss={() => setStatusMessage(null)}
+              >
+                {statusMessage.text}
+              </MessageBar>
+            </div>
+          )}
+          
           {/* Map Controls */}
           <MapControls 
             isMapLoaded={isMapLoaded} 
             canConnect={providers.length >= 2}
-            onAddMarker={handleAddRandomMarker}
+            isAddingMarker={isAddingMarker}
+            onAddMarker={handleAddMarkerMode}
             onConnectMarkers={handleConnectRandomMarkers}
           />
           
