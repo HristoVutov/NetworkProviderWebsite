@@ -5,14 +5,15 @@ import Header from "../common/Header";
 import SidePanel from "./SidePanel";
 import MapControls from "./MapControls";
 import { styles } from "./mapStyles";
-import { initialProviders, providerTypes, getPowerGridIcon } from "./mapData";
+import { providerTypes, getPowerGridIcon } from "./mapData";
 import { createZigzagPath, loadGoogleMapsApi, createInfoWindow } from "./mapUtils";
 
 const ProviderMap = () => {
   // State variables
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
-  const [providers, setProviders] = useState(initialProviders);
+  const [providers, setProviders] = useState([]);
   const [connections, setConnections] = useState([]);
   const [isAddingMarker, setIsAddingMarker] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
@@ -22,6 +23,78 @@ const ProviderMap = () => {
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const clickListenerRef = useRef(null);
+  const markersRef = useRef([]);
+
+  // Function to fetch providers data from API
+  const fetchProviderData = async () => {
+    try {
+      const response = await axios.get('http://localhost:3001/api/point');
+      const apiData = response.data;
+      
+      // Transform API data to match expected format
+      const transformedData = apiData.map((item, index) => {
+        return {
+          id: item._id,
+          name: `Provider ${index + 1}`,
+          lat: parseFloat(item.Lat),
+          lng: parseFloat(item.Lng),
+          type: providerTypes[Math.floor(Math.random() * providerTypes.length)], // Assign random type
+          providerId: item.Provider
+        };
+      });
+      
+      setProviders(transformedData);
+      setIsDataLoaded(true);
+      
+      // If map is already loaded, add markers for the fetched providers
+      if (googleMapRef.current && window.google) {
+        addMarkersToMap(transformedData);
+      }
+      
+    } catch (error) {
+      console.error("Error fetching provider data:", error);
+      setMapError("Failed to load provider data. Please try again later.");
+    }
+  };
+
+  // Function to add markers to the map
+  const addMarkersToMap = (providerData) => {
+    // Clear existing markers
+    markersRef.current.forEach(marker => {
+      marker.setMap(null);
+    });
+    markersRef.current = [];
+    
+    // Add markers for providers
+    providerData.forEach(provider => {
+      // Create marker with custom icon
+      const marker = new window.google.maps.Marker({
+        position: { lat: provider.lat, lng: provider.lng },
+        map: googleMapRef.current,
+        title: provider.name,
+        icon: getPowerGridIcon(provider.type)
+      });
+      
+      // Add info window
+      const infoContent = `
+        <div style="padding: 8px;">
+          <h3 style="margin: 0 0 8px 0;">${provider.name}</h3>
+          <p style="margin: 0;">Type: ${provider.type}</p>
+          <p style="margin: 0;">Provider ID: ${provider.providerId || 'N/A'}</p>
+          <p style="margin: 0;">Position: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
+        </div>
+      `;
+      
+      const infoWindow = createInfoWindow(infoContent);
+      
+      marker.addListener('click', () => {
+        openInfoWindow(infoWindow, marker);
+      });
+      
+      // Store marker reference
+      markersRef.current.push(marker);
+    });
+  };
 
   // Function to add a marker at specific coordinates
   const addMarkerAt = (lat, lng) => {
@@ -34,10 +107,10 @@ const ProviderMap = () => {
     const randomType = providerTypes[Math.floor(Math.random() * providerTypes.length)];
     
     // Create new provider
-    const newProviderId = providers.length + 1;
+    const newProviderId = Date.now().toString(); // Temporary ID until API responds
     const newProvider = {
       id: newProviderId,
-      name: `Provider ${newProviderId}`,
+      name: `Provider ${providers.length + 1}`,
       lat: lat,
       lng: lng,
       type: randomType
@@ -67,6 +140,9 @@ const ProviderMap = () => {
       openInfoWindow(infoWindow, marker);
     });
     
+    // Store marker reference
+    markersRef.current.push(marker);
+    
     // Update providers state
     setProviders(prevProviders => [...prevProviders, newProvider]);
 
@@ -76,9 +152,22 @@ const ProviderMap = () => {
     return newProvider;
   };
   
+  // Function to open info window
+  const openInfoWindow = (infoWindow, marker) => {
+    // Close any currently open info window
+    if (activeInfoWindowRef.current) {
+      activeInfoWindowRef.current.close();
+    }
+    
+    // Open the new info window
+    infoWindow.open(googleMapRef.current, marker);
+    
+    // Update the reference to the currently open info window
+    activeInfoWindowRef.current = infoWindow;
+  };
+
   // Function to send coordinates to API
-   // Function to send coordinates to API
-   const sendCoordinatesToAPI = async (lat, lng) => {
+  const sendCoordinatesToAPI = async (lat, lng) => {
     try {
       // Get auth token from cookie
       const authToken = document.cookie
@@ -122,6 +211,9 @@ const ProviderMap = () => {
         setStatusMessage(null);
       }, 3000);
       
+      // Refresh data from API to get the new marker with its server-assigned ID
+      fetchProviderData();
+      
     } catch (error) {
       console.error('Error sending coordinates to API:', error);
       
@@ -147,19 +239,6 @@ const ProviderMap = () => {
       }
     }
   };
-  
-const openInfoWindow = (infoWindow, marker) => {
-  // Close any currently open info window
-  if (activeInfoWindowRef.current) {
-    activeInfoWindowRef.current.close();
-  }
-  
-  // Open the new info window
-  infoWindow.open(googleMapRef.current, marker);
-  
-  // Update the reference to the currently open info window
-  activeInfoWindowRef.current = infoWindow;
-};
 
   // Function to toggle marker addition mode
   const handleAddMarkerMode = () => {
@@ -291,36 +370,15 @@ const openInfoWindow = (infoWindow, marker) => {
         // Store map reference
         googleMapRef.current = map;
         
-        // Wait a moment to ensure the map is fully loaded
-        setTimeout(() => {
-          // Add markers for initial providers
-          providers.forEach(provider => {
-            // Create marker with custom icon
-            const marker = new window.google.maps.Marker({
-              position: { lat: provider.lat, lng: provider.lng },
-              map: map,
-              title: provider.name,
-              icon: getPowerGridIcon(provider.type)
-            });
-            
-            // Add info window
-            const infoContent = `
-              <div style="padding: 8px;">
-                <h3 style="margin: 0 0 8px 0;">${provider.name}</h3>
-                <p style="margin: 0;">Type: ${provider.type}</p>
-              </div>
-            `;
-            
-            const infoWindow = createInfoWindow(infoContent);
-            
-            marker.addListener('click', () => {
-              openInfoWindow(infoWindow, marker);
-            });
-          });
-          
-          setIsMapLoaded(true);
-          console.log("Map initialized successfully");
-        }, 500);
+        // Set map as loaded
+        setIsMapLoaded(true);
+        
+        // If we already have provider data, add markers
+        if (isDataLoaded && providers.length > 0) {
+          addMarkersToMap(providers);
+        }
+        
+        console.log("Map initialized successfully");
       } catch (error) {
         console.error("Error initializing Google Maps:", error);
         setMapError("Failed to initialize Google Maps. Please try again later.");
@@ -335,6 +393,9 @@ const openInfoWindow = (infoWindow, marker) => {
       }
       initMap();
     });
+    
+    // Fetch provider data
+    fetchProviderData();
     
     // Clean up
     return () => {
@@ -351,8 +412,20 @@ const openInfoWindow = (infoWindow, marker) => {
       if (clickListenerRef.current && window.google && window.google.maps) {
         window.google.maps.event.removeListener(clickListenerRef.current);
       }
+      
+      // Clear markers
+      markersRef.current.forEach(marker => {
+        marker.setMap(null);
+      });
     };
   }, []); // Empty dependency array means this runs once on mount
+
+  // Effect to add markers when both map and data are loaded
+  useEffect(() => {
+    if (isMapLoaded && isDataLoaded && providers.length > 0 && googleMapRef.current) {
+      addMarkersToMap(providers);
+    }
+  }, [isMapLoaded, isDataLoaded]);
 
   return (
     <>
