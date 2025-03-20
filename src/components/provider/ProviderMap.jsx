@@ -5,7 +5,7 @@ import Header from "../common/Header";
 import SidePanel from "./SidePanel";
 import MapControls from "./MapControls";
 import { styles } from "./mapStyles";
-import { providerTypes, getPowerGridIcon } from "./mapData";
+import { providerTypes } from "./mapData";
 import { createZigzagPath, loadGoogleMapsApi, createInfoWindow } from "./mapUtils";
 
 const ProviderMap = () => {
@@ -67,12 +67,11 @@ const ProviderMap = () => {
     
     // Add markers for providers
     providerData.forEach(provider => {
-      // Create marker with custom icon
+      // Create marker with standard icon
       const marker = new window.google.maps.Marker({
         position: { lat: provider.lat, lng: provider.lng },
         map: googleMapRef.current,
-        title: provider.name,
-        icon: getPowerGridIcon(provider.type)
+        title: provider.name
       });
       
       // Add info window
@@ -116,13 +115,12 @@ const ProviderMap = () => {
       type: randomType
     };
     
-    // Create marker with icon
+    // Create marker with standard icon
     const marker = new window.google.maps.Marker({
       position: { lat: lat, lng: lng },
       map: googleMapRef.current,
       title: newProvider.name,
-      animation: window.google.maps.Animation.DROP,
-      icon: getPowerGridIcon(randomType)
+      animation: window.google.maps.Animation.DROP
     });
     
     // Add info window
