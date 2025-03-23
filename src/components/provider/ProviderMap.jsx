@@ -4,9 +4,10 @@ import axios from "axios";
 import Header from "../common/Header";
 import SidePanel from "./SidePanel";
 import MapControls from "./MapControls";
+import EditMarkerModal from "./EditMarkerModal";
 import { styles } from "./mapStyles";
 import { providerTypes } from "./mapData";
-import { createZigzagPath, loadGoogleMapsApi, createInfoWindow } from "./mapUtils";
+import { createZigzagPath, loadGoogleMapsApi, createInfoWindow, mapInitRegistry } from "./mapUtils";
 
 const ProviderMap = () => {
 // State variables
@@ -19,6 +20,10 @@ const [isAddingMarker, setIsAddingMarker] = useState(false);
 const [isSelectingMarkers, setIsSelectingMarkers] = useState(false);
 const [statusMessage, setStatusMessage] = useState(null);
 
+// Modal state
+const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+const [selectedProvider, setSelectedProvider] = useState(null);
+
 // Refs
 const activeInfoWindowRef = useRef(null);
 const mapRef = useRef(null);
@@ -27,6 +32,7 @@ const clickListenerRef = useRef(null);
 const markersRef = useRef([]);
 const isSelectingMarkersRef = useRef(false); // Ref to track selection mode
 const selectedMarkersRef = useRef([]); // Ref to track selected markers
+
 const fetchProviderData = async () => {
   try {
     const response = await axios.get('http://localhost:3001/api/point');
@@ -109,6 +115,130 @@ const createInitialConnections = (providerData, rawData) => {
   console.log(`Created ${connectionCount} initial connections`);
 };
 
+// Handle opening the edit modal
+const handleEditProvider = (provider) => {
+  // Close any open info window
+  if (activeInfoWindowRef.current) {
+    activeInfoWindowRef.current.close();
+  }
+  
+  // Set the selected provider and open the modal
+  setSelectedProvider(provider);
+  setIsEditModalOpen(true);
+};
+
+// Handle provider update from the modal
+const handleProviderUpdate = (updatedProvider) => {
+  // Update the providers state with the updated provider
+  setProviders(prevProviders => 
+    prevProviders.map(provider => 
+      provider.id === updatedProvider.id ? updatedProvider : provider
+    )
+  );
+  
+  // Update the marker on the map
+  const markerToUpdate = markersRef.current.find(marker => 
+    marker.provider && marker.provider.id === updatedProvider.id
+  );
+  
+  if (markerToUpdate) {
+    // Update marker position
+    markerToUpdate.setPosition({ lat: updatedProvider.lat, lng: updatedProvider.lng });
+    
+    // Update provider data on the marker
+    markerToUpdate.provider = updatedProvider;
+    markerToUpdate.setTitle(updatedProvider.name);
+    
+    // Update info window content
+    const infoContent = createInfoWindowContent(updatedProvider);
+    const infoWindow = createInfoWindow(infoContent);
+    
+    // Add click listener to the marker
+    window.google.maps.event.clearListeners(markerToUpdate, 'click');
+    markerToUpdate.addListener('click', () => {
+      // Check if in selection mode
+      if (isSelectingMarkersRef.current) {
+        handleMarkerSelection(markerToUpdate, updatedProvider);
+      } else {
+        // Otherwise show info window
+        openInfoWindow(infoWindow, markerToUpdate);
+      }
+    });
+  }
+  
+  // Update connections status if needed
+  updateConnectionsAfterProviderUpdate(updatedProvider);
+  
+  // Fetch provider data again to ensure everything is synced
+  fetchProviderData();
+};
+
+// Function to update connections after a provider has been updated
+const updateConnectionsAfterProviderUpdate = (updatedProvider) => {
+  // Update connections related to this provider
+  connections.forEach(connection => {
+    // Check if this provider is part of the connection
+    const isFromProvider = connection.from === updatedProvider.id;
+    const isToProvider = connection.to === updatedProvider.id;
+    
+    if (isFromProvider || isToProvider) {
+      // Find the other provider in the connection
+      const otherProviderId = isFromProvider ? connection.to : connection.from;
+      const otherProvider = providers.find(p => p.id === otherProviderId);
+      
+      if (otherProvider) {
+        // Check if both providers are stopped
+        const bothStopped = updatedProvider.status === "Stopped" && otherProvider.status === "Stopped";
+        
+        // If the bothStopped state has changed, update the connection color
+        if (bothStopped !== connection.bothStopped) {
+          // Update connection color
+          connection.polyline.setOptions({
+            strokeColor: bothStopped ? '#FF0000' : '#00CC00'
+          });
+          
+          // Update blink timer if needed
+          if (bothStopped && !connection.blinkTimerId) {
+            // Start blinking
+            connection.blinkTimerId = makePolylineBlink(connection.polyline);
+          } else if (!bothStopped && connection.blinkTimerId) {
+            // Stop blinking
+            clearInterval(connection.blinkTimerId);
+            connection.blinkTimerId = null;
+            connection.polyline.setOptions({ strokeOpacity: 1.0 });
+          }
+          
+          // Update connection state
+          connection.bothStopped = bothStopped;
+        }
+      }
+    }
+  });
+};
+
+// Function to create the info window content with an Edit button
+const createInfoWindowContent = (provider) => {
+  return `
+    <div style="padding: 12px; max-width: 300px;">
+      <h3 style="margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${provider.name}</h3>
+      <p style="margin: 4px 0;"><strong>Address:</strong> ${provider.address || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Zone:</strong> ${provider.zone || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Phone 1:</strong> ${provider.phone1 || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Phone 2:</strong> ${provider.phone2 || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>IP:</strong> ${provider.ip || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${provider.status === 'Running' ? 'green' : 'red'};">${provider.status || 'Unknown'}</span></p>
+      <p style="margin: 4px 0; font-size: 0.9em; color: #666;">Location: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
+      <button 
+        id="editButton-${provider.id}" 
+        style="margin-top: 8px; padding: 6px 12px; background-color: #0078d4; color: white; border: none; border-radius: 2px; cursor: pointer;"
+        onclick="window.editProvider('${provider.id}')"
+      >
+        Edit Provider
+      </button>
+    </div>
+  `;
+};
+
 // Function to add markers to the map
 const addMarkersToMap = (providerData) => {
   // Clear existing markers
@@ -130,23 +260,22 @@ const addMarkersToMap = (providerData) => {
     
     // Store provider data directly on the marker for easy access
     marker.provider = provider;
-    console.log(provider)
-    // Add info window
-    const infoContent = `
-    <div style="padding: 12px; max-width: 300px;">
-      <h3 style="margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${provider.name}</h3>
-      <p style="margin: 4px 0;"><strong>Address:</strong> ${provider.address || 'N/A'}</p>
-      <p style="margin: 4px 0;"><strong>Zone:</strong> ${provider.zone || 'N/A'}</p>
-      <p style="margin: 4px 0;"><strong>Phone 1:</strong> ${provider.phone1 || 'N/A'}</p>
-      <p style="margin: 4px 0;"><strong>Phone 2:</strong> ${provider.phone2 || 'N/A'}</p>
-      <p style="margin: 4px 0;"><strong>IP:</strong> ${provider.ip || 'N/A'}</p>
-      <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${provider.status === 'Running' ? 'green' : 'red'};">${provider.status || 'Unknown'}</span></p>
-      <p style="margin: 4px 0; font-size: 0.9em; color: #666;">Location: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
-    </div>
-  `;
     
+    // Create info window content with Edit button
+    const infoContent = createInfoWindowContent(provider);
+    
+    // Create info window
     const infoWindow = createInfoWindow(infoContent);
     
+    // Add global function to handle edit button clicks from info window
+    window.editProvider = (providerId) => {
+      const providerToEdit = providers.find(p => p.id === providerId);
+      if (providerToEdit) {
+        handleEditProvider(providerToEdit);
+      }
+    };
+    
+    // Add click listener to the marker
     marker.addListener('click', () => {
       // Always check the current value from the ref, not the state captured in closure
       console.log("Marker clicked, isSelectingMarkers (ref):", isSelectingMarkersRef.current);
@@ -304,6 +433,20 @@ const sendConnectionToAPI = async (marker1Id, marker2Id) => {
   }
 };
 
+// Function to open info window
+const openInfoWindow = (infoWindow, marker) => {
+  // Close any currently open info window
+  if (activeInfoWindowRef.current) {
+    activeInfoWindowRef.current.close();
+  }
+  
+  // Open the new info window
+  infoWindow.open(googleMapRef.current, marker);
+  
+  // Update the reference to the currently open info window
+  activeInfoWindowRef.current = infoWindow;
+};
+
 // Function to add a marker at specific coordinates
 const addMarkerAt = (lat, lng) => {
   if (!googleMapRef.current || !window.google || !window.google.maps) {
@@ -333,17 +476,13 @@ const addMarkerAt = (lat, lng) => {
     provider: newProvider
   });
   
-  // Add info window
-  const infoContent = `
-    <div style="padding: 8px;">
-      <h3 style="margin: 0 0 8px 0;">${newProvider.name}</h3>
-      <p style="margin: 0;">Type: ${newProvider.type}</p>
-      <p style="margin: 0;">Position: ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
-    </div>
-  `;
+  // Create info window content with Edit button
+  const infoContent = createInfoWindowContent(newProvider);
   
+  // Create info window
   const infoWindow = createInfoWindow(infoContent);
   
+  // Add click listener
   marker.addListener('click', () => {
     // Handle marker selection if in selection mode
     if (isSelectingMarkers) {
@@ -364,20 +503,6 @@ const addMarkerAt = (lat, lng) => {
   sendCoordinatesToAPI(lat, lng);
 
   return newProvider;
-};
-
-// Function to open info window
-const openInfoWindow = (infoWindow, marker) => {
-  // Close any currently open info window
-  if (activeInfoWindowRef.current) {
-    activeInfoWindowRef.current.close();
-  }
-  
-  // Open the new info window
-  infoWindow.open(googleMapRef.current, marker);
-  
-  // Update the reference to the currently open info window
-  activeInfoWindowRef.current = infoWindow;
 };
 
 // Function to send coordinates to API
@@ -678,9 +803,9 @@ const cancelSelectionMode = () => {
 
 // Initialize map when component mounts
 useEffect(() => {
-  // Function to initialize map
-  const initMap = () => {
-    console.log("Initializing map...");
+  // Define the map initialization function
+  const initMainMap = () => {
+    console.log("Initializing main map...");
     if (!mapRef.current || !window.google || !window.google.maps) {
       console.error("Map reference or Google Maps not available");
       return;
@@ -689,9 +814,9 @@ useEffect(() => {
     try {
       // Create a new map instance
       const map = new window.google.maps.Map(mapRef.current, {
-        center: { lat: 20, lng: 0 },
-        zoom: 2,
-        mapTypeControl: true,
+        center: { lat: 42.659934,  lng: 24.056087 },
+        zoom: 7,
+        mapTypeControl: false,
         fullscreenControl: true,
         streetViewControl: false
       });
@@ -707,12 +832,15 @@ useEffect(() => {
         addMarkersToMap(providers);
       }
       
-      console.log("Map initialized successfully");
+      console.log("Main map initialized successfully");
     } catch (error) {
       console.error("Error initializing Google Maps:", error);
       setMapError("Failed to initialize Google Maps. Please try again later.");
     }
   };
+
+  // Register the main map initialization function
+  mapInitRegistry.register(initMainMap);
 
   // Load Google Maps API
   loadGoogleMapsApi((error) => {
@@ -720,7 +848,7 @@ useEffect(() => {
       setMapError(error.message);
       return;
     }
-    initMap();
+    // The mapInitRegistry will handle the map initialization
   });
   
   // Fetch provider data
@@ -752,6 +880,9 @@ useEffect(() => {
     markersRef.current.forEach(marker => {
       marker.setMap(null);
     });
+    
+    // Remove global edit provider function
+    delete window.editProvider;
   };
 }, []); // Empty dependency array means this runs once on mount
 
@@ -824,6 +955,19 @@ return (
         providers={providers}
         connections={connections}
       />
+      
+      {/* Edit Provider Modal */}
+      {isEditModalOpen && selectedProvider && (
+        <EditMarkerModal
+          isOpen={isEditModalOpen}
+          onDismiss={() => {
+            setIsEditModalOpen(false);
+            setSelectedProvider(null);
+          }}
+          provider={selectedProvider}
+          onUpdate={handleProviderUpdate}
+        />
+      )}
     </div>
   </>
 );
