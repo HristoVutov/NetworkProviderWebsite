@@ -45,7 +45,8 @@ const fetchProviderData = async () => {
         lng: parseFloat(item.Lng),
         type: providerTypes[Math.floor(Math.random() * providerTypes.length)], // Assign random type
         providerId: item.Provider,
-        previousPoint: item.PreviousPoint // Store previous point reference
+        previousPoint: item.PreviousPoint, // Store previous point reference
+        status: item.Status // Include the status property
       };
     });
     
@@ -135,6 +136,7 @@ const addMarkersToMap = (providerData) => {
         <p style="margin: 0;">Marker ID: ${provider.id || 'N/A'}</p>
         <p style="margin: 0;">Provider ID: ${provider.providerId || 'N/A'}</p>
         <p style="margin: 0;">Position: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
+        ${provider.status ? `<p style="margin: 0;">Status: ${provider.status}</p>` : ''}
       </div>
     `;
     
@@ -493,6 +495,26 @@ const handleAddMarkerMode = () => {
   }
 };
 
+// Function to make a polyline blink
+const makePolylineBlink = (polyline) => {
+  // Create a reference for the interval ID so we can clear it later
+  let timerId = null;
+  const blinkInterval = 800; // Blinking interval in milliseconds
+  let visible = true;
+  
+  // Start the blinking interval
+  timerId = setInterval(() => {
+    // Toggle visibility by changing opacity
+    visible = !visible;
+    polyline.setOptions({
+      strokeOpacity: visible ? 1.0 : 0.2
+    });
+  }, blinkInterval);
+  
+  // Return the timer ID so it can be cleared later
+  return timerId;
+};
+
 // Function to connect two markers selected by the user
 const connectMarkers = (provider1, provider2, sendToApi = true) => {
   if (!googleMapRef.current) {
@@ -513,16 +535,26 @@ const connectMarkers = (provider1, provider2, sendToApi = true) => {
       { lat: provider2.lat, lng: provider2.lng }
     ];
     
-    // Create the polyline with green color
+    // Determine line color based on markers' status
+    const bothStopped = (provider1.status === "Stopped" && provider2.status === "Stopped");
+    const lineColor = bothStopped ? '#FF0000' : '#00CC00'; // Red if both stopped, otherwise Green
+    
+    // Create the polyline with appropriate color
     const connectionId = connections.length + 1;
     const polyline = new window.google.maps.Polyline({
       path: path,
       geodesic: true,
-      strokeColor: '#00CC00', // Green color
+      strokeColor: lineColor, // Dynamic color based on status
       strokeOpacity: 1.0,
       strokeWeight: 4,
       map: googleMapRef.current
     });
+    
+    // Start blinking if both providers are stopped
+    let blinkTimerId = null;
+    if (bothStopped) {
+      blinkTimerId = makePolylineBlink(polyline);
+    }
     
     // Calculate midpoint for info window
     const midpoint = {
@@ -536,6 +568,8 @@ const connectMarkers = (provider1, provider2, sendToApi = true) => {
         <h3 style="margin: 0 0 8px 0;">Connection ${connectionId}</h3>
         <p style="margin: 0;">From: ${provider1.name} (${provider1.type})</p>
         <p style="margin: 0;">To: ${provider2.name} (${provider2.type})</p>
+        ${provider1.status ? `<p style="margin: 0;">Status From: ${provider1.status || 'Unknown'}</p>` : ''}
+        ${provider2.status ? `<p style="margin: 0;">Status To: ${provider2.status || 'Unknown'}</p>` : ''}
       </div>
     `;
     
@@ -557,7 +591,9 @@ const connectMarkers = (provider1, provider2, sendToApi = true) => {
       id: connectionId,
       from: provider1.id,
       to: provider2.id,
-      polyline: polyline
+      polyline: polyline,
+      bothStopped: bothStopped,
+      blinkTimerId: blinkTimerId // Store the timer ID for cleanup
     };
     
     // Update connections state
@@ -689,8 +725,14 @@ useEffect(() => {
   return () => {
     window.initGoogleMaps = null;
     
-    // Clean up connections
+    // Clean up connections and blink timers
     connections.forEach(connection => {
+      // Clear any blinking interval timers
+      if (connection.blinkTimerId) {
+        clearInterval(connection.blinkTimerId);
+      }
+      
+      // Remove polyline from map
       if (connection.polyline) {
         connection.polyline.setMap(null);
       }
