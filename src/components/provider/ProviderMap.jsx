@@ -27,8 +27,6 @@ const clickListenerRef = useRef(null);
 const markersRef = useRef([]);
 const isSelectingMarkersRef = useRef(false); // Ref to track selection mode
 const selectedMarkersRef = useRef([]); // Ref to track selected markers
-
-// Function to fetch providers data from API
 const fetchProviderData = async () => {
   try {
     const response = await axios.get('http://localhost:3001/api/point');
@@ -36,17 +34,22 @@ const fetchProviderData = async () => {
     
     console.log("API data:", apiData);
     
-    // Transform API data to match expected format
+    // Update transformation to include all fields from the JSON data
     const transformedData = apiData.map((item, index) => {
       return {
         id: item._id,
-        name: `Provider ${index + 1}`,
+        name: item.Name, // Use the actual Name from the data
+        address: item.Address,
+        zone: item.Zone,
+        phone1: item.Phone1,
+        phone2: item.Phone2,
+        ip: item.IP,
         lat: parseFloat(item.Lat),
         lng: parseFloat(item.Lng),
-        type: providerTypes[Math.floor(Math.random() * providerTypes.length)], // Assign random type
+        type: providerTypes[Math.floor(Math.random() * providerTypes.length)],
         providerId: item.Provider,
-        previousPoint: item.PreviousPoint, // Store previous point reference
-        status: item.Status // Include the status property
+        previousPoint: item.PreviousPoint,
+        status: item.Status
       };
     });
     
@@ -130,15 +133,17 @@ const addMarkersToMap = (providerData) => {
     console.log(provider)
     // Add info window
     const infoContent = `
-      <div style="padding: 8px;">
-        <h3 style="margin: 0 0 8px 0;">${provider.name}</h3>
-        <p style="margin: 0;">Type: ${provider.type}</p>
-        <p style="margin: 0;">Marker ID: ${provider.id || 'N/A'}</p>
-        <p style="margin: 0;">Provider ID: ${provider.providerId || 'N/A'}</p>
-        <p style="margin: 0;">Position: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
-        ${provider.status ? `<p style="margin: 0;">Status: ${provider.status}</p>` : ''}
-      </div>
-    `;
+    <div style="padding: 12px; max-width: 300px;">
+      <h3 style="margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">${provider.name}</h3>
+      <p style="margin: 4px 0;"><strong>Address:</strong> ${provider.address || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Zone:</strong> ${provider.zone || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Phone 1:</strong> ${provider.phone1 || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Phone 2:</strong> ${provider.phone2 || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>IP:</strong> ${provider.ip || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Status:</strong> <span style="color: ${provider.status === 'Running' ? 'green' : 'red'};">${provider.status || 'Unknown'}</span></p>
+      <p style="margin: 4px 0; font-size: 0.9em; color: #666;">Location: ${provider.lat.toFixed(6)}, ${provider.lng.toFixed(6)}</p>
+    </div>
+  `;
     
     const infoWindow = createInfoWindow(infoContent);
     
