@@ -53,8 +53,8 @@ const Header = ({ history }) => {
     }
   }, []);
 
-  // CommandBar items for navigation
-  const _items = [
+   // CommandBar items for navigation
+   const _items = [
     {
       key: 'home',
       text: 'Home',
@@ -66,6 +66,12 @@ const Header = ({ history }) => {
       text: 'Provider Map',
       iconProps: { iconName: 'MapPin' },
       onClick: () => history.push('/provider-map'),
+    },
+    {
+      key: 'customers',
+      text: 'Customers',
+      iconProps: { iconName: 'People' },
+      onClick: () => history.push('/customers'),
     },
   ];
 

@@ -5,6 +5,7 @@ import { moneyGrowTheme, initializeTheme } from "./theme/themeConfig";
 import Home from "./components/home/Home";
 import ProviderMap from "./components/provider/ProviderMap";
 import Login from "./components/account/Login";
+import CustomersList from "./components/customers/CustomersList";
 import Unauthorized from "./components/common/Unauthorized";
 
 // Inside Switch
@@ -21,6 +22,7 @@ function App() {
     <Switch>
       <Route exact path="/" component={Home} />      
       <Route path="/provider-map" component={ProviderMap} />
+      <Route path="/customers" component={CustomersList} />
       <Route path="/account/login" component={Login} />
       <Route path="/unauthorized" component={Unauthorized} />
     </Switch>
