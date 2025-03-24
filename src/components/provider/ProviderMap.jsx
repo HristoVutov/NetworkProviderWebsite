@@ -33,6 +33,26 @@ const markersRef = useRef([]);
 const isSelectingMarkersRef = useRef(false); // Ref to track selection mode
 const selectedMarkersRef = useRef([]); // Ref to track selected markers
 
+// Function to get marker icon based on status
+const getStatusMarkerIcon = (status) => {
+  if (!window.google || !window.google.maps) return null;
+  
+  // Set color based on status
+  const color = status === "Running" ? "#00CC00" : // Green
+              status === "Stopped" ? "#FF0000" : // Red
+              "#888888"; // Gray for unknown
+  
+  // Create a simple colored marker icon
+  return {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeWeight: 2,
+    strokeColor: '#FFFFFF',
+    scale: 10
+  };
+};
+
 const fetchProviderData = async () => {
   try {
     const response = await axios.get('http://localhost:3001/api/point');
@@ -149,6 +169,9 @@ const handleProviderUpdate = (updatedProvider) => {
     markerToUpdate.provider = updatedProvider;
     markerToUpdate.setTitle(updatedProvider.name);
     
+    // Update marker icon based on new status
+    markerToUpdate.setIcon(getStatusMarkerIcon(updatedProvider.status));
+    
     // Update info window content
     const infoContent = createInfoWindowContent(updatedProvider);
     const infoWindow = createInfoWindow(infoContent);
@@ -251,11 +274,12 @@ const addMarkersToMap = (providerData) => {
   providerData.forEach((provider, index) => {
     console.log(`Creating marker ${index} for ${provider.name} at ${provider.lat},${provider.lng}`);
     
-    // Create marker with standard icon
+    // Create marker with status-colored icon
     const marker = new window.google.maps.Marker({
       position: { lat: provider.lat, lng: provider.lng },
       map: googleMapRef.current,
       title: provider.name,
+      icon: getStatusMarkerIcon(provider.status) // Use our new function here
     });
     
     // Store provider data directly on the marker for easy access
@@ -348,9 +372,9 @@ const handleMarkerSelection = (marker, provider) => {
         }
       });
       
-      // Reset all marker icons
+      // Reset all marker icons to their status-based icons
       markersRef.current.forEach(m => {
-        m.setIcon(null);
+        m.setIcon(getStatusMarkerIcon(m.provider.status));
       });
       
       // Exit selection mode - update both state and ref
@@ -368,9 +392,9 @@ const handleMarkerSelection = (marker, provider) => {
         text: `Connection failed: ${error.message}`
       });
       
-      // Reset on error
+      // Reset on error - restore status-based icons
       markersRef.current.forEach(m => {
-        m.setIcon(null);
+        m.setIcon(getStatusMarkerIcon(m.provider.status));
       });
       
       // Exit selection mode - update both state and ref
@@ -457,22 +481,24 @@ const addMarkerAt = (lat, lng) => {
   // Get random provider type
   const randomType = providerTypes[Math.floor(Math.random() * providerTypes.length)];
   
-  // Create new provider
+  // Create new provider with "Running" as default status
   const newProviderId = Date.now().toString(); // Temporary ID until API responds
   const newProvider = {
     id: newProviderId,
     name: `Provider ${providers.length + 1}`,
     lat: lat,
     lng: lng,
-    type: randomType
+    type: randomType,
+    status: "Running" // Set default status to Running
   };
   
-  // Create marker with standard icon
+  // Create marker with status-colored icon (green for Running)
   const marker = new window.google.maps.Marker({
     position: { lat: lat, lng: lng },
     map: googleMapRef.current,
     title: newProvider.name,
     animation: window.google.maps.Animation.DROP,
+    icon: getStatusMarkerIcon(newProvider.status),
     provider: newProvider
   });
   
@@ -790,9 +816,9 @@ const cancelSelectionMode = () => {
   // Clear selected markers
   selectedMarkersRef.current = [];
   
-  // Reset all marker icons
+  // Reset all marker icons to status-based icons
   markersRef.current.forEach(m => {
-    m.setIcon(null);
+    m.setIcon(getStatusMarkerIcon(m.provider.status));
   });
   
   // Clear status message
