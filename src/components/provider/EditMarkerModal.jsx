@@ -84,6 +84,7 @@ const EditMarkerModal = ({ isOpen, onDismiss, provider, onUpdate }) => {
     phone1: '',
     phone2: '',
     ip: '',
+    mac: '',
     status: '',
     lat: 0,
     lng: 0,
@@ -108,6 +109,7 @@ const EditMarkerModal = ({ isOpen, onDismiss, provider, onUpdate }) => {
         name: provider.name || '',
         address: provider.address || '',
         zone: provider.zone || '',
+        mac: provider.macAddress || '',
         phone1: provider.phone1 || '',
         phone2: provider.phone2 || '',
         ip: provider.ip || '',
@@ -318,6 +320,7 @@ const EditMarkerModal = ({ isOpen, onDismiss, provider, onUpdate }) => {
         name: formData.name,
         address: formData.address,
         zone: formData.zone,
+        mac: formData.mac,
         phone1: formData.phone1,
         phone2: formData.phone2,
         ip: formData.ip,
@@ -348,6 +351,7 @@ const EditMarkerModal = ({ isOpen, onDismiss, provider, onUpdate }) => {
           address: formData.address,
           zone: formData.zone,
           phone1: formData.phone1,
+          mac: formData.mac,
           phone2: formData.phone2,
           ip: formData.ip,
           status: formData.status,
@@ -475,7 +479,19 @@ const EditMarkerModal = ({ isOpen, onDismiss, provider, onUpdate }) => {
               />
             </Stack.Item>
           </Stack>
-          
+          <TextField
+              label="MAC Address"
+              value={formData.mac}
+              onChange={(e, newValue) => handleInputChange(e, newValue, 'mac')}
+              disabled={isLoading}
+              description="Format: XX:XX:XX:XX:XX:XX"
+              placeholder="e.g., f0:a7:31:54:07:67"
+              styles={{
+                root: {
+                  marginBottom: '10px'
+                }
+              }}
+            />
           <TextField
             label="IP"
             value={formData.ip}

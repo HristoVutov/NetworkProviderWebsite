@@ -184,19 +184,20 @@ const CustomersList = () => {
 
     // Format the customer data to match what EditMarkerModal expects
     const formattedCustomer = {
-      id: customer._id,
-      name: customer.Name,
-      address: customer.Address,
-      zone: customer.Zone,
-      phone1: customer.Phone1,
-      phone2: customer.Phone2,
-      ip: customer.IP,
-      status: customer.Status,
-      lat: parseFloat(customer.Lat),
-      lng: parseFloat(customer.Lng),
-      providerId: customer.Provider,
-      previousPoint: customer.PreviousPoint
-    };
+        id: customer._id,
+        name: customer.Name,
+        address: customer.Address,
+        zone: customer.Zone,
+        phone1: customer.Phone1,
+        phone2: customer.Phone2,
+        ip: customer.IP,
+        macAddress: customer.MacAddress,
+        status: customer.Status,
+        lat: parseFloat(customer.Lat),
+        lng: parseFloat(customer.Lng),
+        providerId: customer.Provider,
+        previousPoint: customer.PreviousPoint
+      };
     
     // Set the selected customer and open the modal
     setSelectedCustomer(formattedCustomer);

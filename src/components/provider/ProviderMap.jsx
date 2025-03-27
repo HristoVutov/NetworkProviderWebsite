@@ -70,6 +70,7 @@ const fetchProviderData = async () => {
         phone1: item.Phone1,
         phone2: item.Phone2,
         ip: item.IP,
+        macAddress: item.MacAddress,
         lat: parseFloat(item.Lat),
         lng: parseFloat(item.Lng),
         type: providerTypes[Math.floor(Math.random() * providerTypes.length)],
