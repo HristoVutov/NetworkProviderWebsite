@@ -148,6 +148,92 @@ const handleEditProvider = (provider) => {
   setIsEditModalOpen(true);
 };
 
+// Function to handle connection deletion
+const handleDeleteConnection = async (fromProviderId, toProviderId, connectionId) => {
+  // Close the info window immediately
+  if (activeInfoWindowRef.current) {
+    activeInfoWindowRef.current.close();
+    activeInfoWindowRef.current = null;
+  }
+  try {
+    // Get auth token from cookie
+    const authToken = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('auth-token='))
+      ?.split('=')[1];
+      
+    if (!authToken) {
+      console.error("No auth token found for API request");
+      setStatusMessage({
+        type: MessageBarType.warning,
+        text: 'Authentication required to delete connection'
+      });
+      return;
+    }
+
+    // Send the delete request
+    const url = `http://localhost:3001/api/point/${toProviderId}/disconnect`;
+    console.log(`Sending disconnection request to: ${url}`);
+    
+    const response = await axios.delete(
+      url,
+      {
+        headers: {
+          'auth-token': authToken
+        }
+      }
+    );
+    
+    console.log('API disconnection response:', response.data);
+    
+    // Find the connection in our connections array
+    const connectionToDelete = connections.find(conn => 
+      conn.id === connectionId && conn.from === fromProviderId && conn.to === toProviderId
+    );
+    
+    if (connectionToDelete) {
+      // Remove the polyline from the map
+      connectionToDelete.polyline.setMap(null);
+      
+      // Stop any blinking interval if it exists
+      if (connectionToDelete.blinkTimerId) {
+        clearInterval(connectionToDelete.blinkTimerId);
+      }
+      
+      // Update connections state
+      setConnections(prevConnections => 
+        prevConnections.filter(conn => conn.id !== connectionId)
+      );
+      
+      // Close the info window
+      if (activeInfoWindowRef.current) {
+        activeInfoWindowRef.current.close();
+        activeInfoWindowRef.current = null;
+      }
+      
+      // Show success message
+      setStatusMessage({
+        type: MessageBarType.success,
+        text: 'Connection deleted successfully'
+      });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setStatusMessage(null);
+      }, 3000);
+      
+      // Fetch provider data to ensure UI is in sync with backend
+      fetchProviderData();
+    }
+  } catch (error) {
+    console.error('Error deleting connection:', error);
+    setStatusMessage({
+      type: MessageBarType.error,
+      text: `Failed to delete connection: ${error.response?.data?.message || error.message}`
+    });
+  }
+};
+
 // Handle provider update from the modal
 const handleProviderUpdate = (updatedProvider) => {
   // Update the providers state with the updated provider
@@ -719,7 +805,7 @@ const connectMarkers = (provider1, provider2, sendToApi = true) => {
       lng: (provider1.lng + provider2.lng) / 2
     };
     
-    // Create info window content
+    // Create info window content with delete button
     const infoContent = `
       <div style="padding: 8px;">
         <h3 style="margin: 0 0 8px 0;">Connection ${connectionId}</h3>
@@ -727,6 +813,13 @@ const connectMarkers = (provider1, provider2, sendToApi = true) => {
         <p style="margin: 0;">To: ${provider2.name} (${provider2.type})</p>
         ${provider1.status ? `<p style="margin: 0;">Status From: ${provider1.status || 'Unknown'}</p>` : ''}
         ${provider2.status ? `<p style="margin: 0;">Status To: ${provider2.status || 'Unknown'}</p>` : ''}
+        <button 
+          id="deleteConnection-${connectionId}" 
+          style="margin-top: 8px; padding: 6px 12px; background-color: #d83b01; color: white; border: none; border-radius: 2px; cursor: pointer;"
+          onclick="window.deleteConnection('${provider1.id}', '${provider2.id}', ${connectionId})"
+        >
+          Delete Connection
+        </button>
       </div>
     `;
     
@@ -881,6 +974,19 @@ useEffect(() => {
   // Fetch provider data
   fetchProviderData();
   
+  // Add global function to handle edit button clicks from info window
+  window.editProvider = (providerId) => {
+    const providerToEdit = providers.find(p => p.id === providerId);
+    if (providerToEdit) {
+      handleEditProvider(providerToEdit);
+    }
+  };
+  
+  // Add global function to handle connection deletion from info window
+  window.deleteConnection = (fromProviderId, toProviderId, connectionId) => {
+    handleDeleteConnection(fromProviderId, toProviderId, parseInt(connectionId));
+  };
+  
   // Clean up
   return () => {
     window.initGoogleMaps = null;
@@ -908,8 +1014,9 @@ useEffect(() => {
       marker.setMap(null);
     });
     
-    // Remove global edit provider function
+    // Remove global functions
     delete window.editProvider;
+    delete window.deleteConnection;
   };
 }, []); // Empty dependency array means this runs once on mount
 
